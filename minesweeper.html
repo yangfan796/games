@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>情侣双人扫雷</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-grad-a: #ffe4e6; /* pink-100 */
+      --bg-grad-b: #f5f3ff; /* indigo-50 */
+      --primary: #ef4444;   /* red-500 */
+      --secondary: #06b6d4; /* cyan-500 */
+      --accent: #8b5cf6;    /* violet-500 */
+      --cell-light: #e2e8f0; /* slate-300 */
+      --cell-dark: #cbd5e1;  /* slate-400 */
+      --border: #9ca3af;     /* gray-400 */
+      --border-revealed: #6b7280; /* gray-500 */
+      --mine-bg: #fde8e8;    /* red-100 */
+      --mine-border: #ef4444; /* red-500 */
+      --last-outline: #f59e0b; /* amber-500 */
+    }
+    body {
+      margin: 0; min-height: 100vh; font-family: 'Nunito', system-ui, -apple-system, Segoe UI, Roboto;
+      background: linear-gradient(135deg, var(--bg-grad-a), var(--bg-grad-b));
+    }
+    .container { max-width: 920px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.08); padding: 16px; margin-bottom: 16px; }
+    .title { text-align: center; }
+    .title h1 { font-size: 32px; margin: 10px 0 6px; letter-spacing: .5px; background: linear-gradient(90deg, #f43f5e, #8b5cf6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .subtitle { color: #6b7280; font-size: 14px; line-height: 1.5; }
+
+    .status { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .player { text-align: center; }
+    .pill { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; margin: 0 auto 6px; }
+    .pill.p1 { background: var(--primary); }
+    .pill.p2 { background: var(--secondary); }
+    .current { text-align: center; }
+    .current .who { font-size: 18px; font-weight: 800; color: #374151; }
+    .current .hint { font-size: 12px; color: #9ca3af; }
+    .counts { font-size: 12px; color: #6b7280; }
+    .highlight { color: var(--accent); font-weight: 800; }
+
+    .board-wrap { text-align: center; }
+    .board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; max-width: 640px; margin: 0 auto; }
+    .cell { position: relative; aspect-ratio: 1; border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all .2s ease; }
+    .cell.light { background: var(--cell-light); }
+    .cell.dark { background: var(--cell-dark); }
+    .cell:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.10); border-color: var(--accent); }
+    .cell.revealed { background: #fff; border-color: var(--border-revealed); }
+    .cell.last { box-shadow: 0 0 0 3px var(--last-outline); }
+    .cell .content { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; }
+    .cell.mine.revealed { background: var(--mine-bg); border-color: var(--mine-border); }
+
+    /* 数字颜色增强（经典扫雷配色） */
+    .cell.revealed .content.num0 { color: #9ca3af; }
+    .cell.revealed .content.num1 { color: #1d4ed8; }
+    .cell.revealed .content.num2 { color: #16a34a; }
+    .cell.revealed .content.num3 { color: #dc2626; }
+    .cell.revealed .content.num4 { color: #4f46e5; }
+    .cell.revealed .content.num5 { color: #b91c1c; }
+    .cell.revealed .content.num6 { color: #0d9488; }
+    .cell.revealed .content.num7 { color: #111827; }
+    .cell.revealed .content.num8 { color: #6b7280; }
+
+    /* 踩雷特效 */
+    @keyframes shake { 0%,100%{ transform: translate(0,0);} 20%{ transform: translate(-2px,0);} 40%{ transform: translate(2px,0);} 60%{ transform: translate(-2px,0);} 80%{ transform: translate(2px,0);} }
+    @keyframes flash { 0%{ box-shadow: 0 0 0 rgba(239,68,68,0);} 50%{ box-shadow: 0 0 16px rgba(239,68,68,.8);} 100%{ box-shadow: 0 0 0 rgba(239,68,68,0);} }
+    .boom { animation: shake .35s ease, flash .8s ease; }
+
+    .controls { text-align: center; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer; font-weight: 800; background: #e5e7eb; }
+    .btn-primary { background: #8b5cf6; color: #fff; }
+    .btn-secondary { background: #06b6d4; color: #fff; }
+    .btn:hover { opacity: .9; }
+
+    /* 简易弹窗样式（兼容性强） */
+    dialog.modal { border: none; border-radius: 16px; padding: 0; width: 90%; max-width: 420px; }
+    .modal-box { padding: 16px; }
+    .modal-action { display: flex; justify-content: flex-end; padding-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 标题 -->
+    <div class="card title">
+      <h1>💕 情侣双人扫雷 💕</h1>
+      <div class="subtitle">8×8 网格，随机 15 雷；轮流点击，每人每回合一次。踩雷触发甜蜜任务与炫酷特效；先踩满 8 颗即结束，输方接受轻松有趣的惩罚～</div>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="card status">
+      <div class="player">
+        <div class="pill p1">❶</div>
+        <div>玩家1</div>
+        <div class="counts">已踩雷：<span id="p1Mines">0</span></div>
+      </div>
+
+      <div class="current">
+        <div class="who">当前：<span id="currentWho" class="highlight">玩家1</span></div>
+        <div class="hint">每人每回合点击 1 次</div>
+      </div>
+
+      <div class="player">
+        <div class="pill p2">❷</div>
+        <div>玩家2</div>
+        <div class="counts">已踩雷：<span id="p2Mines">0</span></div>
+      </div>
+    </div>
+
+    <!-- 棋盘 -->
+    <div class="card board-wrap">
+      <div id="board" class="board"></div>
+    </div>
+
+    <!-- 控制 -->
+    <div class="card controls">
+      <button class="btn" id="resetBtn">重新开始</button>
+    </div>
+  </div>
+
+  <!-- 任务弹窗 -->
+  <dialog id="taskModal" class="modal">
+    <div class="modal-box">
+      <h3 style="font-weight:800; font-size:18px; color:#ef4444;">甜蜜任务</h3>
+      <div id="taskContent" style="margin-top:10px; color:#374151;"></div>
+      <div class="modal-action">
+        <button class="btn btn-secondary" id="taskDone">完成</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 结束弹窗 -->
+  <dialog id="endModal" class="modal">
+    <div class="modal-box">
+      <h3 style="font-weight:800; font-size:18px; color:#8b5cf6;">游戏结束</h3>
+      <div id="endContent" style="margin-top:10px; color:#374151;"></div>
+      <div class="modal-action">
+        <button class="btn btn-primary" id="endReset">重新开始</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    const ROWS = 8, COLS = 8;
+    const TOTAL = ROWS * COLS; // 64
+    const TOTAL_MINES = 15;
+    const WIN_THRESHOLD = 8; // 某方先踩到8颗雷就结束
+
+    const taskList = [
+      "给对方一个甜蜜的拥抱 🤗",
+      "说一句情话让对方脸红 😊",
+      "一起自拍一张甜蜜合照 📸",
+      "给对方一个温柔的吻 💋",
+      "为对方写一条彩虹屁 ✍️",
+      "互换手机壁纸一天 📱",
+      "分享一个小秘密（不许敷衍） 🤫",
+      "学对方最可爱的表情并拍照 😜",
+      "用手比心一起拍照 💞",
+      "约定下一次约会的计划 📅",
+      "亲吻对方手背或额头 💖",
+      "轻轻捏捏对方的脸颊 🌸",
+      "一起跳10秒的小舞蹈 💃🕺",
+      "讲一个冷笑话，看谁先笑 🧊😂",
+      "说第一次见面时的心动瞬间 ✨",
+      "互相夸赞今天的穿搭并评分 👗👔",
+      "一起回忆一次最难忘的旅行片段 🧭",
+      "为对方唱一段最拿手的歌词 🎤",
+      "用三句话描绘对方的可爱之处 🥰",
+      "悄悄在纸上写下对方的三个优点 📝",
+      "一起制定一周的小目标并互相监督 ✅",
+      "互相画一个简笔头像并展示 🎨",
+      "发一条甜蜜动态（仅对彼此可见） 📲",
+      "为对方做一个小小的手部按摩 💆‍♀️",
+      "一起做10个同步深呼吸，感受心跳 💓",
+      "分享一本最近想读的书并约定日期 📚",
+      "互相交换一个可爱的小礼物（可自制） 🎁",
+      "一起模仿一段彼此的口头禅并录音 🎙️",
+      "共同完成一个小游戏（剪刀石头布） ✌️",
+      "约定下次见面要实现的一件小事 📌"
+    ];
+
+    let state = {
+      currentPlayer: 1,
+      p1Mines: 0,
+      p2Mines: 0,
+      revealed: 0,
+      isGameOver: false,
+      lastClicked: -1,
+      board: [] // {hasMine, revealed, adjacent}
+    };
+
+    function secureRandomInt(min, max) {
+      const range = max - min + 1;
+      if (window.crypto && window.crypto.getRandomValues) {
+        const buf = new Uint32Array(1);
+        window.crypto.getRandomValues(buf);
+        return min + (buf[0] % range);
+      }
+      return min + Math.floor(Math.random() * range);
+    }
+
+    function randomMines() {
+      const set = new Set();
+      while (set.size < TOTAL_MINES) {
+        set.add(secureRandomInt(0, TOTAL - 1));
+      }
+      return set;
+    }
+
+    function idx(r, c) { return r * COLS + c; }
+
+    function neighbors(index) {
+      const r = Math.floor(index / COLS), c = index % COLS;
+      const res = [];
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+            res.push(idx(nr, nc));
+          }
+        }
+      }
+      return res;
+    }
+
+    function calcAdjacents() {
+      for (let i = 0; i < TOTAL; i++) {
+        if (state.board[i].hasMine) { state.board[i].adjacent = 0; continue; }
+        const ns = neighbors(i);
+        let cnt = 0;
+        for (const ni of ns) cnt += state.board[ni].hasMine ? 1 : 0;
+        state.board[i].adjacent = cnt;
+      }
+    }
+
+    function initGame() {
+      state.currentPlayer = 1; state.p1Mines = 0; state.p2Mines = 0; state.revealed = 0; state.isGameOver = false; state.lastClicked = -1;
+      const mines = randomMines();
+      state.board = new Array(TOTAL).fill(null).map((_, i) => ({ hasMine: mines.has(i), revealed: false, adjacent: 0 }));
+      calcAdjacents();
+      buildBoardUI();
+      updateStatus();
+    }
+
+    function buildBoardUI() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+      for (let i = 0; i < TOTAL; i++) {
+        const cell = document.createElement('div');
+        const r = Math.floor(i / COLS), c = i % COLS;
+        cell.className = 'cell ' + (((r + c) % 2 === 0) ? 'light' : 'dark');
+        cell.dataset.index = i;
+        const content = document.createElement('div');
+        content.className = 'content';
+        content.textContent = '';
+        cell.appendChild(content);
+        cell.addEventListener('click', onCellClick);
+        boardEl.appendChild(cell);
+      }
+    }
+
+    function updateStatus() {
+      document.getElementById('p1Mines').textContent = state.p1Mines;
+      document.getElementById('p2Mines').textContent = state.p2Mines;
+      document.getElementById('currentWho').textContent = state.currentPlayer === 1 ? '玩家1' : '玩家2';
+    }
+
+    function onCellClick(e) {
+      const taskModal = document.getElementById('taskModal');
+      if (state.isGameOver || (taskModal && taskModal.open)) return;
+      const index = parseInt(e.currentTarget.dataset.index, 10);
+      const cell = state.board[index];
+      if (cell.revealed) return;
+
+      revealCell(index);
+      checkEnd();
+      if (!state.isGameOver) {
+        // 每次点击后切换到另一位
+        state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
+        updateStatus();
+      }
+    }
+
+    function revealCell(index) {
+      const cellState = state.board[index];
+      const boardEl = document.getElementById('board');
+      const cellEl = boardEl.children[index];
+      const content = cellEl.querySelector('.content');
+      cellState.revealed = true;
+      cellEl.classList.add('revealed');
+      state.revealed++;
+
+      // 高亮最近一次点击位置
+      if (state.lastClicked >= 0) {
+        const prevEl = boardEl.children[state.lastClicked];
+        if (prevEl) prevEl.classList.remove('last');
+      }
+      cellEl.classList.add('last');
+      state.lastClicked = index;
+
+      if (cellState.hasMine) {
+        // 踩雷：特效 + 记分 + 任务
+        cellEl.classList.add('mine');
+        content.textContent = '💣';
+        cellEl.classList.add('boom');
+        if (state.currentPlayer === 1) state.p1Mines++; else state.p2Mines++;
+        updateStatus();
+        showTask();
+      } else {
+        // 安全格：显示相邻雷数（含0）并增加数字颜色对比
+        const adj = cellState.adjacent;
+        content.textContent = String(adj);
+        content.classList.remove('num0','num1','num2','num3','num4','num5','num6','num7','num8');
+        content.style.color = '';
+        content.classList.add('num' + adj);
+      }
+    }
+
+    function showTask() {
+      const taskModal = document.getElementById('taskModal');
+      const taskContent = document.getElementById('taskContent');
+      const taskDone = document.getElementById('taskDone');
+      const randomTask = taskList[secureRandomInt(0, taskList.length - 1)];
+      taskContent.innerHTML = `<p style="font-size:16px;">${randomTask}</p><p style="font-size:12px;color:#9ca3af;margin-top:6px;">完成后点击“完成”继续</p>`;
+      if (typeof taskModal.showModal === 'function') taskModal.showModal();
+      taskDone.onclick = () => taskModal.close();
+    }
+
+    function checkEnd() {
+      // 条件：全部点完 或 某方先踩到8颗雷
+      if (state.revealed === TOTAL) {
+        endGame('全部格子已点完');
+        return;
+      }
+      if (state.p1Mines >= WIN_THRESHOLD || state.p2Mines >= WIN_THRESHOLD) {
+        const winner = state.p1Mines >= WIN_THRESHOLD ? '玩家1' : '玩家2';
+        endGame(`${winner} 先踩到 ${WIN_THRESHOLD} 颗雷`);
+      }
+    }
+
+    function endGame(reason) {
+      state.isGameOver = true;
+      const endModal = document.getElementById('endModal');
+      const endContent = document.getElementById('endContent');
+      const loser = state.p1Mines > state.p2Mines ? '玩家2' : (state.p2Mines > state.p1Mines ? '玩家1' : '双方平局');
+      const punish = loser === '双方平局' ? '拥抱和解吧 💞' : `${loser} 接受挨打惩罚（轻松有趣地玩~）🥊`;
+      endContent.innerHTML = `
+        <p style="margin:4px 0;">结束原因：<strong>${reason}</strong></p>
+        <p style="margin:4px 0;">玩家1踩雷：<strong>${state.p1Mines}</strong>，玩家2踩雷：<strong>${state.p2Mines}</strong></p>
+        <p style="margin:6px 0; color:#ef4444;">${punish}</p>
+      `;
+      if (typeof endModal.showModal === 'function') endModal.showModal();
+    }
+
+    function resetGame() {
+      const taskModal = document.getElementById('taskModal');
+      const endModal = document.getElementById('endModal');
+      if (taskModal && taskModal.open) taskModal.close();
+      if (endModal && endModal.open) endModal.close();
+      initGame();
+    }
+
+    // 初始化
+    initGame();
+    document.getElementById('resetBtn').addEventListener('click', resetGame);
+    document.getElementById('endReset').addEventListener('click', resetGame);
+  </script>
+</body>
+</html>
