@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>俄罗斯方块 Tetris</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="title">俄罗斯方块</header>
+
+      <div class="hud">
+        <div>分数：<span id="score">0</span></div>
+        <div>等级：<span id="level">1</span></div>
+        <div>行数：<span id="lines">0</span></div>
+      </div>
+
+      <div class="board-wrap">
+        <canvas id="board" width="300" height="600" aria-label="游戏画布"></canvas>
+        <div class="side">
+          <div class="panel">
+            <div class="panel-title">下一块</div>
+            <canvas id="next" width="120" height="120"></canvas>
+          </div>
+          <div class="controls">
+            <button id="startBtn" type="button">开始</button>
+            <button id="pauseBtn" type="button">暂停</button>
+            <button id="restartBtn" type="button">重开</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mobile-controls" aria-label="移动端方向键">
+        <button data-action="rotate" aria-label="旋转">↻</button>
+        <div class="row">
+          <button data-action="left" aria-label="左">←</button>
+          <div class="spacer"></div>
+          <button data-action="right" aria-label="右">→</button>
+        </div>
+        <div class="row">
+          <button data-action="drop" aria-label="下落">↓</button>
+          <button data-action="hard" aria-label="硬降">⇓</button>
+        </div>
+      </div>
+
+      <footer class="tips">键盘：左右移动、上旋转、下软降、空格硬降；清行记分并随等级加速。</footer>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
