@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>贪吃蛇 Snake</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="title">贪吃蛇</header>
+      <div class="tips">方向键或 WASD 控制；吃到红色食物加分并加速。</div>
+      <div class="hud">
+        <div>得分：<span id="score">0</span></div>
+        <div>最高分：<span id="high">0</span></div>
+        <div>速度：<span id="speed">1x</span></div>
+      </div>
+
+      <canvas id="game" width="600" height="600" aria-label="游戏画布"></canvas>
+
+      <div class="controls">
+        <button id="startBtn" type="button">开始</button>
+        <button id="pauseBtn" type="button">暂停</button>
+        <button id="restartBtn" type="button">重开</button>
+      </div>
+
+      <div class="mobile-controls" aria-label="移动端方向键">
+        <button data-dir="up" aria-label="向上">↑</button>
+        <div class="row">
+          <button data-dir="left" aria-label="向左">←</button>
+          <button data-dir="right" aria-label="向右">→</button>
+        </div>
+        <button data-dir="down" aria-label="向下">↓</button>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

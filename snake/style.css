@@ -1,0 +1,101 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Microsoft YaHei", sans-serif;
+  color: #e8e8e8;
+  background: #0f1218;
+  display: grid;
+  place-items: center;
+}
+
+.app { width: min(92vw, 760px);height: 100vh; }
+.title {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 16px 0 8px;
+}
+
+.hud {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 8px 0 12px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+#game {
+  width: 100%;
+  height: auto;
+  border: 1px solid #263043;
+  background: #121624;
+  border-radius: 8px;
+  display: block;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 12px 0;
+}
+.controls button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #2a3a52;
+  color: #d9e3f0;
+  background: #1c2435;
+  cursor: pointer;
+}
+.controls button:hover { filter: brightness(1.1); }
+.controls button:active { transform: translateY(1px); }
+
+.mobile-controls {
+  margin: 10px auto 0;
+  width: clamp(280px, 72vw, 520px);
+  display: grid;
+  gap: 0px;
+  justify-items: center;
+}
+.mobile-controls .row { 
+  display: flex; 
+  gap: 10px; 
+  justify-content: space-between; 
+  width: 100%;
+}
+.mobile-controls button {
+  width: clamp(75px, 16vw, 110px);
+  height: clamp(75px, 16vw, 110px);
+  border-radius: 12px;
+  border: 1px solid #2a3a52;
+  color: #d9e3f0;
+  background: #1c2435;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.mobile-controls button:active { transform: scale(0.98); }
+
+/* 当高度不足时以叠层方式固定在底部右侧，便于拇指点击 */
+.mobile-controls.overlay {
+  position: fixed;
+  z-index: 10;
+  bottom: clamp(12px, 4vh, 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0;
+}
+
+
+.tips {
+  text-align: center;
+  font-size: 12px;
+  color: #93a1b6;
+  margin:16px;
+}
+
+@media (min-width: 720px) {
+  .mobile-controls { display: none; }
+}
