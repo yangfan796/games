@@ -1,0 +1,556 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head><script type="module">document.addEventListener("DOMContentLoaded",()=>{const insScript=document.createElement("script");const date=Date.now();insScript.src="/inscode_devtools_sdk.js?v="+date;insScript.type="module";document.body.appendChild(insScript);});</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>情侣飞行棋 - 甜蜜互动版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/daisyui/4.12.10/full.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .chess-cell {
+            aspect-ratio: 1;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .chess-cell:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .start-cell {
+            background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+            color: white;
+        }
+        
+        .end-cell {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            color: white;
+        }
+        
+        .special-cell {
+            background: linear-gradient(135deg, #feca57, #ff9ff3);
+            color: white;
+        }
+        
+        .player1 {
+            background: #ff6b6b;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+        }
+        
+        .player2 {
+            background: #4ecdc4;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+        }
+        
+        .dice {
+            width: 80px;
+            height: 80px;
+            background: white;
+            border: 3px solid #e5e7eb;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            will-change: transform;
+            perspective: 400px;
+        }
+        
+        .dice:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        
+        .dice.rolling {
+            animation: roll3d 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        
+        @keyframes roll3d {
+            0% { transform: rotateX(0deg) rotateY(0deg) scale(1); }
+            25% { transform: rotateX(180deg) rotateY(90deg) scale(1.1); }
+            50% { transform: rotateX(360deg) rotateY(180deg) scale(1.15); }
+            75% { transform: rotateX(540deg) rotateY(270deg) scale(1.05); }
+            100% { transform: rotateX(720deg) rotateY(360deg) scale(1); }
+        }
+        
+        .task-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 10px 0;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .heart-animation {
+            animation: heartbeat 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            14% { transform: scale(1.1); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.1); }
+            70% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-pink-100 via-purple-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-4 md:py-8">
+        <!-- 标题区域 -->
+        <div class="text-center mb-4 md:mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 mb-1 md:mb-2">
+                💕 情侣飞行棋 💕
+            </h1>
+            <p class="text-gray-600">甜蜜互动，增进感情的必备神器</p>
+        </div>
+
+        <!-- 游戏状态 -->
+        <div class="bg-white rounded-2xl shadow-xl p-4 md:p-6 mb-4 md:mb-6">
+            <div class="flex justify-between items-center">
+                <div class="text-center">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-red-400 rounded-full flex items-center justify-center text-white font-bold mb-2">
+                        ❶
+                    </div>
+                    <p class="font-semibold text-red-500">玩家1</p>
+                    <p class="text-sm text-gray-600">位置: <span id="pos1">0</span></p>
+                </div>
+                
+                <div id="statusCenter" class="text-center cursor-pointer select-none" onclick="triggerDice()" title="点击摇骰子">
+                    <div class="text-2xl font-bold text-gray-700">
+                        第 <span id="round">1</span> 轮
+                    </div>
+                    <div class="text-lg font-semibold text-purple-600">
+                        当前: <span id="currentPlayer">玩家1</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">点击此处摇骰子</div>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-10 h-10 md:w-12 md:h-12 bg-cyan-400 rounded-full flex items-center justify-center text-white font-bold mb-2">
+                        ❷
+                    </div>
+                    <p class="font-semibold text-cyan-500">玩家2</p>
+                    <p class="text-sm text-gray-600">位置: <span id="pos2">0</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 棋盘区域 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            <h3 class="text-xl font-bold text-center mb-4 text-gray-800">甜蜜棋盘</h3>
+            <div class="chess-board" id="chessBoard">
+                <!-- 棋盘将通过JavaScript生成 -->
+            </div>
+        </div>
+
+        <!-- 控制区域（重新开始） -->
+        <div class="bg-white rounded-2xl shadow-xl p-4 md:p-6 mb-4 md:mb-6">
+            <div class="text-center">
+                <button class="btn btn-secondary" onclick="resetGame()">
+                    <i class="fas fa-redo mr-2"></i>重新开始
+                </button>
+            </div>
+        </div>
+
+        <!-- 甜蜜任务弹窗（模态） -->
+        <dialog id="taskModal" class="modal">
+            <div class="modal-box">
+                <h3 class="font-bold text-lg">
+                    <i class="fas fa-heart text-red-500 heart-animation"></i>
+                    甜蜜任务
+                </h3>
+                <div id="taskContent" class="task-card mt-4"></div>
+                <div class="modal-action">
+                    <button id="taskCloseBtn" class="btn btn-primary">完成</button>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>关闭</button>
+            </form>
+        </dialog>
+        <!-- 胜利弹窗（模态） -->
+        <dialog id="winModal" class="modal">
+            <div class="modal-box">
+                <h3 class="font-bold text-lg">
+                    🎉 胜利！
+                </h3>
+                <p id="winText" class="mt-2 text-base">恭喜某玩家获胜！</p>
+                <div class="modal-action">
+                    <button id="winRestartBtn" class="btn btn-primary">重新开始</button>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>关闭</button>
+            </form>
+        </dialog>
+        <!-- 模态骰子弹窗 -->
+        <dialog id="diceModal" class="modal">
+            <div class="modal-box">
+                <h3 class="font-bold text-lg">
+                    <i class="fas fa-dice text-purple-500"></i>
+                    正在摇骰子
+                </h3>
+                <div class="mt-4 flex items-center justify-center">
+                    <div class="dice" id="modalDice">
+                        <span id="modalDiceValue">🎲</span>
+                    </div>
+                </div>
+                <div class="text-center text-xs text-gray-400 mt-2">结果出现后自动关闭</div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>关闭</button>
+            </form>
+        </dialog>
+    </div>
+
+    <script>
+        // 游戏状态
+        let gameState = {
+            player1Pos: 0,
+            player2Pos: 0,
+            currentPlayer: 1,
+            round: 1,
+            isRolling: false,
+            gameOver: false,
+            isMoving: false,
+            fastForwardRequested: false
+        };
+
+        // 特殊格子任务
+        const specialTasks = [
+            "给对方一个甜蜜的拥抱 🤗",
+            "说一句情话让对方脸红 😊",
+            "一起自拍一张甜蜜合照 📸",
+            "给对方一个温柔的吻 💋",
+            "分享一个你们的美好回忆 💭",
+            "一起唱首情歌 🎵",
+            "给对方按摩30秒 💆‍♀️",
+            "说出对方的三个优点 ⭐",
+            "一起做个爱的承诺 💝",
+            "给对方一个公主抱 👑",
+            // 新增更多有趣任务
+            "互换手机壁纸一天 📱",
+            "分享一个小秘密（不许敷衍） 🤫",
+            "模仿对方说话10秒 🎭",
+            "一起做10个深蹲（加油） 🏋️",
+            "为对方写一条彩虹屁 ✍️",
+            "学对方最可爱的表情并拍照 😜",
+            "给对方画一颗心并展示 ❤️🖍️",
+            "用手比心一起拍照 💞",
+            "互发一条“我喜欢你”的消息 💌",
+            "约定下一次约会的计划 📅",
+            "一起喝一口水补水 💧",
+            "亲吻对方手背或额头 💖",
+            "轻轻捏捏对方的脸颊 🌸",
+            "一起跳10秒的小舞蹈 💃🕺",
+            "讲一个冷笑话，看谁先笑 🧊😂",
+            "抢答对方的生日或星座 🎂",
+            "说第一次见面时的心动瞬间 ✨",
+            "交换一个随身小物品一天 🎁",
+            "选一首今天的主题曲并一起听 🎶"
+        ];
+
+        // 特殊格子位置
+        const specialCells = [5, 12, 18, 25,29, 32, 38, 44, 45, 52, 58, 65];
+
+        // 初始化棋盘
+        function initBoard() {
+            const board = document.getElementById('chessBoard');
+            board.innerHTML = '';
+            
+            for (let i = 0; i < 70; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'chess-cell';
+                cell.id = `cell-${i}`;
+                
+                if (i === 0) {
+                    cell.classList.add('start-cell');
+                    cell.innerHTML = '起点';
+                } else if (i === 69) {
+                    cell.classList.add('end-cell');
+                    cell.innerHTML = '终点';
+                } else if (specialCells.includes(i)) {
+                    cell.classList.add('special-cell');
+                    cell.innerHTML = '❤️';
+                } else {
+                    cell.innerHTML = i;
+                }
+                
+                board.appendChild(cell);
+            }
+            
+            updateBoard();
+        }
+
+        // 更新棋盘显示
+        function updateBoard() {
+            // 清除所有玩家标记
+            document.querySelectorAll('.player1, .player2').forEach(el => el.remove());
+            
+            // 添加玩家1标记
+            if (gameState.player1Pos <= 69) {
+                const cell1 = document.getElementById(`cell-${gameState.player1Pos}`);
+                const player1Mark = document.createElement('div');
+                player1Mark.className = 'player1';
+                player1Mark.innerHTML = '❤️';
+                cell1.appendChild(player1Mark);
+            }
+            
+            // 添加玩家2标记
+            if (gameState.player2Pos <= 69) {
+                const cell2 = document.getElementById(`cell-${gameState.player2Pos}`);
+                const player2Mark = document.createElement('div');
+                player2Mark.className = 'player2';
+                player2Mark.innerHTML = '💙';
+                cell2.appendChild(player2Mark);
+            }
+            
+            // 更新显示信息
+            document.getElementById('pos1').textContent = gameState.player1Pos;
+            document.getElementById('pos2').textContent = gameState.player2Pos;
+            document.getElementById('round').textContent = gameState.round;
+            document.getElementById('currentPlayer').textContent = 
+                gameState.currentPlayer === 1 ? '玩家1' : '玩家2';
+        }
+
+        // 更强随机函数（可用则用加密随机）
+        function secureRandomInt(min, max) {
+            const range = max - min + 1;
+            if (window.crypto && window.crypto.getRandomValues) {
+                const buf = new Uint32Array(1);
+                window.crypto.getRandomValues(buf);
+                return min + (buf[0] % range);
+            }
+            return min + Math.floor(Math.random() * range);
+        }
+
+        // 打开模态并摇骰子
+        function triggerDice() {
+            const taskModal = document.getElementById('taskModal');
+            const diceModal = document.getElementById('diceModal');
+            // 若正在逐格移动，快速点击将触发加速完成剩余动画
+            if (gameState.isMoving) {
+                gameState.fastForwardRequested = true;
+                return;
+            }
+            if (gameState.isRolling || gameState.gameOver || (taskModal && taskModal.open)) return;
+            if (diceModal && typeof diceModal.showModal === 'function') {
+                diceModal.showModal();
+            }
+            rollDiceInModal();
+        }
+
+        // 投掷骰子（3秒滚动后显示结果，停留0.5秒再关闭并移动）
+        function rollDiceInModal() {
+            const diceModal = document.getElementById('diceModal');
+            if (gameState.isRolling || !diceModal || !diceModal.open) return;
+
+            gameState.isRolling = true;
+            const dice = document.getElementById('modalDice');
+            const diceValue = document.getElementById('modalDiceValue');
+
+            dice.classList.add('rolling');
+
+            const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+            const rollingDuration = 3000; // 3s滚动
+            const ticks = 24;             // 逐步减速的刷新次数
+            let lastValue = 0;
+
+            // 根据easeOut曲线，在3秒内分布刷新点数
+            for (let i = 0; i < ticks - 1; i++) {
+                const t = i / (ticks - 1);
+                const time = Math.floor(easeOutCubic(t) * rollingDuration);
+                setTimeout(() => {
+                    let next;
+                    do { next = secureRandomInt(1, 6); } while (next === lastValue && Math.random() < 0.5);
+                    lastValue = next;
+                    diceValue.textContent = next;
+                }, time);
+            }
+
+            // 在3秒时确定最终结果并显示
+            setTimeout(() => {
+                const finalValue = secureRandomInt(1, 6);
+                diceValue.textContent = finalValue;
+
+                // 结果停留0.5秒后关闭弹窗，再开始移动棋子
+                setTimeout(() => {
+                    dice.classList.remove('rolling');
+                    const diceModalEl = document.getElementById('diceModal');
+                    if (diceModalEl && diceModalEl.open) diceModalEl.close();
+                    gameState.isRolling = false;
+                    movePlayer(finalValue);
+                }, 500);
+            }, rollingDuration);
+        }
+
+        // 移动玩家
+        function movePlayer(steps) {
+            if (gameState.gameOver) return;
+            gameState.isMoving = true;
+            gameState.fastForwardRequested = false;
+            const slowDelay = 220;
+            const fastDelay = 60;
+            let currentDelay = slowDelay;
+
+            const isP1 = gameState.currentPlayer === 1;
+            const startPos = isP1 ? gameState.player1Pos : gameState.player2Pos;
+            const targetPos = Math.min(69, startPos + steps);
+            let pos = startPos;
+
+            function stepOnce() {
+                if (gameState.fastForwardRequested) currentDelay = fastDelay;
+                if (pos >= targetPos) {
+                    gameState.isMoving = false;
+                    // 到达后检查特殊格子和胜利
+                    checkSpecialCell(targetPos);
+                    updateBoard();
+                    if (gameState.player1Pos === 69 || gameState.player2Pos === 69) {
+                        gameState.gameOver = true;
+                        const winner = gameState.player1Pos === 69 ? '玩家1' : '玩家2';
+                        showWinModal(winner);
+                        return;
+                    }
+                    // 切换玩家与轮次
+                    gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+                    if (gameState.currentPlayer === 1) {
+                        gameState.round++;
+                    }
+                    updateBoard();
+                    return;
+                }
+                pos += 1;
+                if (isP1) {
+                    gameState.player1Pos = pos;
+                } else {
+                    gameState.player2Pos = pos;
+                }
+                updateBoard();
+                setTimeout(stepOnce, currentDelay);
+            }
+
+            stepOnce();
+        }
+
+        // 检查特殊格子（弹窗提示）
+        function checkSpecialCell(position) {
+            if (specialCells.includes(position)) {
+                const taskModal = document.getElementById('taskModal');
+                const taskContent = document.getElementById('taskContent');
+                const randomTask = specialTasks[secureRandomInt(0, specialTasks.length - 1)];
+                
+                taskContent.innerHTML = `
+                    <h4 class="text-lg font-bold mb-2">甜蜜时刻！</h4>
+                    <p class="text-base">${randomTask}</p>
+                    <p class="text-sm mt-2 opacity-80">完成任务后点击“完成”或背景关闭继续</p>
+                `;
+                
+                if (taskModal && typeof taskModal.showModal === 'function') {
+                    taskModal.showModal();
+                }
+            }
+        }
+
+        // 重置游戏
+        function resetGame() {
+            gameState = {
+                player1Pos: 0,
+                player2Pos: 0,
+                currentPlayer: 1,
+                round: 1,
+                isRolling: false,
+                gameOver: false,
+                isMoving: false,
+                fastForwardRequested: false
+            };
+            
+            const taskModal = document.getElementById('taskModal');
+            if (taskModal && taskModal.open) taskModal.close();
+            const diceModal = document.getElementById('diceModal');
+            if (diceModal && diceModal.open) diceModal.close();
+            updateBoard();
+
+            const modalDiceValue = document.getElementById('modalDiceValue');
+            if (modalDiceValue) modalDiceValue.textContent = '🎲';
+        }
+
+        // 显示胜利弹窗
+        function showWinModal(winner) {
+            const winModal = document.getElementById('winModal');
+            const winText = document.getElementById('winText');
+            if (winText) winText.textContent = `恭喜！${winner}获胜！🎉`;
+            if (winModal && typeof winModal.showModal === 'function') {
+                winModal.showModal();
+            }
+        }
+
+        // 初始化游戏
+        initBoard();
+        // 任务弹窗关闭按钮
+        const taskCloseBtn = document.getElementById('taskCloseBtn');
+        const taskModalEl = document.getElementById('taskModal');
+        if (taskCloseBtn && taskModalEl) {
+            taskCloseBtn.addEventListener('click', () => {
+                taskModalEl.close();
+            });
+        }
+        // 胜利弹窗重新开始
+        const winRestartBtn = document.getElementById('winRestartBtn');
+        const winModalEl = document.getElementById('winModal');
+        if (winRestartBtn && winModalEl) {
+            winRestartBtn.addEventListener('click', () => {
+                winModalEl.close();
+                resetGame();
+            });
+        }
+        // 点击状态中心也可触发摇骰（保证事件绑定存在）
+        const statusCenter = document.getElementById('statusCenter');
+        if (statusCenter) {
+            statusCenter.addEventListener('click', triggerDice);
+        }
+    </script>
+</body>
+</html>
