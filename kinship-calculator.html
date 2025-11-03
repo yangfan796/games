@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>亲戚称谓计算器</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin:0; background:#121212; color:#e5e7eb; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+      .wrap { max-width: 420px; margin: 0 auto; padding: 12px; }
+      .big-display { background:#000; color:#fff; border-radius:12px; padding:16px; min-height:140px; display:flex; flex-direction:column; justify-content:flex-end; }
+      .big-display .hint { color:#9ca3af; font-size:12px; margin-bottom:8px; }
+      .big-display .out { font-size:24px; line-height:1.4; text-align:right; word-break:break-word; }
+      .gender { display:flex; align-items:center; gap:10px; color:#9ca3af; margin: 10px 0 12px; }
+      .gender-toggle { position: relative; width: 90px; height: 28px; border-radius: 999px; background: #1f2937; cursor: pointer; }
+      .gender-toggle .lab { position: absolute; top: 50%; transform: translateY(-50%); font-size: 12px; color: #fff; }
+      .gender-toggle .lab.male { left: 10px; }
+      .gender-toggle .lab.female { right: 10px; }
+      .gender-toggle .knob { position: absolute; top: 2px; width: 24px; height: 24px; border-radius: 999px; background: #ff9f0a; transition: left .2s ease; }
+      .grid { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+      .key { height: 72px; border-radius: 20px; font-size: 20px; border: none; background: #242424; color: #e5e7eb; cursor: pointer; }
+      .key:hover { filter: brightness(1.07); }
+      .key-func { background:#5a5a5a; color:#111; }
+      .key-op { background:#ff9f0a; color:#fff; }
+      .key-eq { grid-row: span 2; }
+      .key:disabled { opacity: .5; cursor: default; }
+      .footer { color:#9ca3af; font-size:12px; margin-top:12px; text-align:center; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="big-display">
+        <div class="hint">我称呼Ta</div>
+        <div id="out" class="out">（请选择关系键）</div>
+      </div>
+      <div class="gender">
+        <div class="gender-toggle" id="genderToggle">
+          <span class="lab male">男</span>
+          <span class="lab female">女</span>
+          <div class="knob" id="genderKnob" style="left:2px"></div>
+        </div>
+      </div>
+      <div class="grid">
+        <button class="key" data-code="f">父</button>
+        <button class="key" data-code="m">母</button>
+        <button class="key key-func" data-code="BS">←</button>
+        <button class="key key-func" data-code="AC">AC</button>
+
+        <button class="key" data-code="b">兄</button>
+        <button class="key" data-code="z">姐</button>
+        <button class="key" data-code="h">夫</button>
+        <button class="key" data-code="w">妻</button>
+
+        <button class="key" data-code="yb">弟</button>
+        <button class="key" data-code="ys">妹</button>
+        <button class="key" data-code="SEP">之</button>
+        <button class="key key-op key-eq" data-code="EQ">=</button>
+
+        <button class="key" data-code="s">子</button>
+        <button class="key" data-code="d">女</button>
+      </div>
+      <div class="footer">提示：本计算器按常用关系键自动推断称谓。</div>
+    </div>
+
+    <script>
+      class KinshipCalculator {
+        constructor() {}
+        isParent(t){ return t==='f' || t==='m'; }
+        isChild(t){ return t==='s' || t==='d'; }
+        isSibling(t){ return t==='b' || t==='yb' || t==='z' || t==='ys'; }
+        normalize(tokens){
+          // 1) 忽略“之”与“=”
+          let arr = tokens.filter(t => t!=='SEP' && t!=='EQ');
+          if (arr.length===0) return arr;
+          // 1.5) 将连续的同代兄弟姐妹折叠为“最后一个兄弟姐妹”（只改变性别，不改变辈分）
+          {
+            const folded = [];
+            let i=0;
+            while(i<arr.length){
+              if(this.isSibling(arr[i])){
+                let j=i;
+                while(j<arr.length && this.isSibling(arr[j])) j++;
+                // 用最后一个同代的性别来表示该同代序列
+                folded.push(arr[j-1]);
+                i=j;
+              }else{
+                folded.push(arr[i]);
+                i++;
+              }
+            }
+            arr = folded;
+          }
+          // 2) 父/母之间的兄弟姐妹清除：P S* P -> P P
+          let changed = true;
+          while (changed) {
+            changed = false;
+            for (let i=0; i<arr.length-2; i++){
+              if (!this.isParent(arr[i])) continue;
+              let j=i+1;
+              while (j<arr.length && this.isSibling(arr[j])) j++;
+              if (j<arr.length && this.isParent(arr[j]) && j>i+1){
+                // 删除 i+1..j-1
+                arr = arr.slice(0, i+1).concat(arr.slice(j));
+                changed = true;
+                break;
+              }
+            }
+          }
+          // 2.5) 开头是兄弟姐妹，后面紧跟父/母：S* P -> P
+          if (this.isSibling(arr[0])){
+            let k=0;
+            while(k<arr.length && this.isSibling(arr[k])) k++;
+            if (k<arr.length && this.isParent(arr[k])){
+              arr = arr.slice(k); // 删除开头的同代序列
+            }
+          }
+          // 3) 末尾兄弟姐妹清除：祖辈同代的兄弟姐妹视为同代祖辈
+          // 为支持“父母的兄弟/姐妹”等关系，末尾兄弟姐妹不在归一化阶段清除，
+          // 由 getTitle 进行语义映射到叔伯/姑姨/舅姨等。
+          return arr;
+        }
+        parentsLabel(parents, {prefix='' , spouse=false}={}){
+          // parents 是仅由 f/m 组成的数组
+          if (parents.length===0) return '';
+          const sideFirst = parents[0];
+          const depth = parents.length;
+          const last = parents[depth-1];
+          const male = last==='f';
+          const female = last==='m';
+          // 生成代称
+          const genWord = (d)=>{
+            if (d===1) return '';
+            if (d===2) return '祖';
+            if (d===3) return '曾祖';
+            if (d===4) return '高祖';
+            if (d===5) return '天祖';
+            if (d===6) return '烈祖';
+            if (d===7) return '太祖';
+            return '远祖';
+          };
+          if (spouse){
+            // 妻子线：岳 + (侧) + 代称 + 父/母
+            if (depth===1){ return male? '岳父' : '岳母'; }
+            const outer = sideFirst==='m' ? '外' : '';
+            const main = `岳${outer}${genWord(depth)}${male?'父':'母'}`;
+          if (depth===2){
+            const syn = male ? (sideFirst==='f' ? '妻子的爷爷' : '妻子的外公')
+                             : (sideFirst==='f' ? '妻子的奶奶' : '妻子的外婆');
+            return `${main}、${syn}`;
+          }
+          return main;
+          }
+          // 自己的祖辈
+          if (depth===1){ return male? '父亲' : '母亲'; }
+          const outer = sideFirst==='m' ? '外' : '';
+          const main = `${outer}${genWord(depth)}${male?'父':'母'}`;
+          if (depth===2){
+            const syn = male ? (sideFirst==='f' ? '爷爷' : '外公')
+                             : (sideFirst==='f' ? '奶奶' : '外婆/姥姥');
+            return `${main}${syn.includes('/')? '、' : '、'}${syn}`;
+          }
+          return main;
+        }
+        descLabel(children){
+          if (children.length===0) return '';
+          const first = children[0];
+          const last = children[children.length-1];
+          const outer = first==='d'; // 女儿起始为外系
+          const depth = children.length;
+          const genWord = (d)=>{
+            if (d===1) return '';
+            if (d===2) return '孙';
+            if (d===3) return '曾孙';
+            if (d===4) return '玄孙';
+            return '远孙';
+          };
+          if (depth===1){ return last==='s' ? '儿子' : '女儿'; }
+          const base = genWord(depth) + (last==='s' ? (depth===2? '子' : '') : (depth===2? '女' : '女'));
+          if (!outer){
+            // 非外系：孙/曾孙/玄孙 …
+            if (depth===2){ return last==='s' ? '孙子' : '孙女'; }
+            return last==='s' ? genWord(depth) : `${genWord(depth)}女`;
+          } else {
+            // 外系：外孙/外曾孙/外玄孙 …
+            if (depth===2){ return last==='s' ? '外孙' : '外孙女'; }
+            return last==='s' ? `外${genWord(depth)}` : `外${genWord(depth)}女`;
+          }
+        }
+        getTitle(tokens){
+          const arr = this.normalize(tokens);
+          if (arr.length===0) return '（请选择关系键）';
+          // 配偶直接称呼
+          if (arr.length===1 && arr[0]==='w') return '妻子';
+          if (arr.length===1 && arr[0]==='h') return '丈夫';
+
+          // 妻子祖辈：w + parents
+          if (arr[0]==='w'){
+            const p = arr.slice(1).filter(t=>this.isParent(t));
+            const c = arr.slice(1).filter(t=>this.isChild(t));
+            if (p.length && p.length>=c.length){
+              const eff = p.slice(0, p.length - c.length);
+              if (eff.length){ return this.parentsLabel(eff, {spouse:true}); }
+            }
+            // 妻子后代可后续补充，这里先回退显示路径
+          }
+
+          // 仅父/母/子/女/兄弟姐妹的混合：先处理特殊关系
+          if (arr.every(t=>this.isParent(t) || this.isChild(t) || this.isSibling(t))){
+            const parents = arr.filter(t=>this.isParent(t));
+            const children = arr.filter(t=>this.isChild(t));
+            const siblings = arr.filter(t=>this.isSibling(t));
+            
+           // 处理"父母 + 兄弟姐妹"的情况（如：母亲的兄弟 = 舅舅、父亲的姐妹 = 姑妈、祖辈的兄弟姐妹 = 舅公/姑婆/伯祖父等）
+           if (parents.length >= 1 && siblings.length >= 1 && children.length === 0) {
+             const sideFirst = parents[0];
+             const depth = parents.length; // 到该祖辈的层级
+             const lastIsMale = (siblings[siblings.length-1] === 'b' || siblings[siblings.length-1] === 'yb');
+             if (depth === 1){
+               if (sideFirst==='f'){ return lastIsMale ? '叔叔/伯父' : '姑妈'; }
+               else { return lastIsMale ? '舅舅' : '姨妈'; }
+             }
+             if (depth === 2){
+               if (sideFirst==='f'){ return lastIsMale ? '伯祖父/叔祖父' : '姑婆'; }
+               else { return lastIsMale ? '舅公' : '姨婆'; }
+             }
+             // depth >= 3：更高辈分的叔伯/姑姨（简化处理）
+             if (sideFirst==='f'){ return lastIsMale ? '伯曾祖父/叔曾祖父' : '姑婆'; }
+             else { return lastIsMale ? '舅公' : '姨婆'; }
+           }
+            if (children.length>=1 && parents.length>=1){
+            const sideFirst = parents[0];
+            const depth = parents.length; // 到该祖辈的层级
+            const maleChild = children[children.length-1]==='s';
+            if (depth===1 && children.length===1){ return maleChild ? '兄弟' : '姐妹'; }
+            if (depth===2 && children.length===1){
+              if (sideFirst==='f'){ return maleChild ? '叔叔/伯父' : '姑妈'; }
+              else { return maleChild ? '舅舅' : '姨妈'; }
+            }
+            if (depth>=3 && children.length===1){
+              if (sideFirst==='f'){ return maleChild ? '伯祖父/叔祖父' : '姑婆'; }
+              else { return maleChild ? '舅公' : '姨婆'; }
+            }
+            if (children.length===2){
+              // 堂表兄弟姐妹：父系为堂，其他为表
+              const prefix = sideFirst==='f' ? '堂' : '表';
+              return maleChild ? prefix+'兄弟' : prefix+'姐妹';
+            }
+            if (children.length>=3){
+              // 更远的堂表关系
+              const prefix = sideFirst==='f' ? '堂' : '表';
+              const genLabel = children.length===3 ? '侄' : '远房';
+              return maleChild ? prefix+genLabel+'子' : prefix+genLabel+'女';
+            }
+          }
+            // 其他情况回退为净代差（用于纯后代或更复杂的子女串）
+            const net = parents.length - children.length;
+            if (net>0){
+              const eff = parents.slice(0, net);
+              return this.parentsLabel(eff);
+            } else if (net<0){
+              const eff = children.slice(0, -net);
+              return this.descLabel(eff);
+            } else {
+              return '同代亲属（需细分）';
+            }
+          }
+
+          // 简易回退：显示“我 的 …”拼接
+          const map = { f:'父', m:'母', s:'子', d:'女', b:'兄', yb:'弟', z:'姐', ys:'妹', h:'夫', w:'妻' };
+          return arr.map(t=>map[t]||t).join(' 的 ');
+        }
+      }
+
+      const calc = new KinshipCalculator();
+      const chain = [];
+      let gender = 'male';
+
+      const outEl = document.getElementById('out');
+      const grid = document.querySelector('.grid');
+      const knob = document.getElementById('genderKnob');
+
+      function applyDisabled(){
+        const last = chain.length ? chain[chain.length-1] : null;
+        document.querySelectorAll('button.key').forEach(btn=>{
+          const code = btn.getAttribute('data-code');
+          const isCtrl = code==='AC' || code==='BS' || code==='EQ' || code==='SEP';
+          if (isCtrl){ btn.disabled = false; return; }
+          // 基于“我”的性别：男不能点“夫”，女不能点“妻”
+          if (gender==='male' && code==='h'){ btn.disabled = true; return; }
+          if (gender==='female' && code==='w'){ btn.disabled = true; return; }
+          // 在出现配偶后，禁止再次选择配偶（避免“我妻子的妻子/我丈夫的丈夫”）
+          if ((last==='w' || last==='h') && (code==='w' || code==='h')){ btn.disabled = true; return; }
+          btn.disabled = false;
+        });
+      }
+      function render() { outEl.textContent = calc.getTitle(chain); applyDisabled(); }
+      render();
+
+      grid.addEventListener('click', (e) => {
+        const btn = e.target.closest('button.key');
+        if (!btn) return;
+        const code = btn.getAttribute('data-code');
+        if (code === 'AC') { chain.length = 0; return render(); }
+        if (code === 'BS') { chain.pop(); return render(); }
+        if (code === 'EQ') { return; }
+        chain.push(code);
+        render();
+      });
+
+      document.getElementById('genderToggle').addEventListener('click', () => {
+        gender = gender === 'male' ? 'female' : 'male';
+        knob.style.left = gender === 'male' ? '2px' : 'calc(100% - 26px)';
+        applyDisabled();
+      });
+    </script>
+  </body>
+</html>
