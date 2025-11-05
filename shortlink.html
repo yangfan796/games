@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>短链接生成器</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card: #111827;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --primary: #22c55e;
+        --primary-press: #16a34a;
+        --danger: #ef4444;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0; padding: 0; background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      }
+      .wrap { min-height: 100%; display: flex; flex-direction: column; }
+      header { padding: 18px 16px; text-align: center; font-weight: 600; }
+      .card {
+        background: var(--card);
+        margin: 0 12px; border-radius: 12px; padding: 0px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      }
+      .label { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+      .input {
+        width: 100%; padding: 14px 12px; border-radius: 10px; border: 1px solid #1f2937;
+        outline: none; background: #0b1220; color: var(--text);
+        font-size: 16px; line-height: 22px;
+      }
+      .row { display: flex; gap: 10px; margin-top: 12px; }
+      .btn {
+        flex: 1; padding: 14px 12px; border: 0; border-radius: 10px; cursor: pointer;
+        font-size: 16px; font-weight: 600; color: #07110a; background: var(--primary);
+      }
+      .btn:active { background: var(--primary-press); }
+      .btn.secondary { flex: none; background: #334155; color: var(--text); }
+      .hint { margin-top: 12px; font-size: 12px; color: var(--muted); }
+
+      .result { margin-top: 16px; display: none; }
+      .result.show { display: block; }
+      .result .box { display: flex; align-items: center; gap: 10px; }
+      .result a { color: #93c5fd; text-decoration: none; word-break: break-all; }
+      .copy { padding: 10px 12px; border-radius: 10px; border: 1px solid #1f2937; cursor: pointer; background: #0b1220; color: var(--text); }
+      .copy:active { background: #0e1628; }
+
+      .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; padding: 10px 14px; border-radius: 10px; background: rgba(0,0,0,0.75); color: #fff; font-size: 14px; display: none; }
+      .toast.show { display: inline-block; }
+      /* 覆盖底部安全距离与固定操作栏样式 */
+      .toast { bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+      .actionbar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(17,24,39,0.92); backdrop-filter: blur(6px); display: flex; gap: 10px; align-items: center; box-shadow: 0 -10px 20px rgba(0,0,0,0.35); }
+      .spacer { height: 76px; }
+      .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: flex-end; }
+      .modal.show { display: flex; }
+      .sheet { width: 100%; background: var(--card); border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+      .sheet .msg { color: var(--text); font-size: 16px; line-height: 1.6; }
+      .sheet .mclose { margin-top: 12px; width: 100%; padding: 12px; border: 0; border-radius: 10px; background: #334155; color: var(--text); font-weight: 600; }
+      /* 隐藏上方按钮行，保留底部固定操作栏 */
+      .row { display: none; }
+      /* 加载遮罩与动画 */
+      .loading { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; z-index: 99; }
+      .loading.show { display: flex; }
+      .spinner { width: 28px; height: 28px; border: 3px solid #94a3b8; border-top-color: transparent; border-radius: 50%; animation: spin 0.9s linear infinite; margin: 0 auto; }
+      .loading .txt { margin-top: 10px; color: var(--muted); font-size: 14px; text-align: center; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>短链接生成器</header>
+      <div class="card">
+        <div class="label">粘贴原始链接</div>
+        <input class="input" id="urlInput" placeholder="例如：https://example.com/path?query=1" />
+        
+
+        <div class="result" id="result">
+          <div class="label">生成结果</div>
+          <div class="box">
+            <a id="shortUrl" href="#" target="_blank" rel="noopener noreferrer"></a>
+            <button class="copy" id="copyBtn">复制</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="loading" id="loading">
+      <div>
+        <div class="spinner"></div>
+        <div class="txt">生成中…</div>
+      </div>
+    </div>
+    <div class="actionbar">
+      <button class="btn" id="genBtn">生成短链接</button>
+      <button class="btn secondary" id="clearBtn">清空</button>
+    </div>
+    <div class="modal" id="modal">
+      <div class="sheet">
+        <div class="msg" id="modalMsg">请输入有效链接</div>
+        <button class="mclose" id="modalClose">我知道了</button>
+      </div>
+    </div>
+
+    <script>
+      const inputEl = document.getElementById('urlInput');
+      const genBtn = document.getElementById('genBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const resEl = document.getElementById('result');
+      const shortEl = document.getElementById('shortUrl');
+      const copyBtn = document.getElementById('copyBtn');
+      const toastEl = document.getElementById('toast');
+      const loadingEl = document.getElementById('loading');
+      const modalEl = document.getElementById('modal');
+      const modalMsgEl = document.getElementById('modalMsg');
+      const modalCloseEl = document.getElementById('modalClose');
+
+      function showToast(msg){
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        setTimeout(()=> toastEl.classList.remove('show'), 1800);
+      }
+      function showModal(msg){
+        modalMsgEl.textContent = msg || '提示';
+        modalEl.classList.add('show');
+      }
+      function hideModal(){ modalEl.classList.remove('show'); }
+      modalEl.addEventListener('click', (e)=>{ if (e.target === modalEl) hideModal(); });
+      modalCloseEl.addEventListener('click', hideModal);
+
+      function normalizeUrl(u){
+        let url = (u || '').trim();
+        if (!url) return '';
+        try {
+          // 若无协议，默认补 http://
+          if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+          // 验证 URL
+          new URL(url);
+          return url;
+        } catch(e) {
+          return '';
+        }
+      }
+
+      async function shortenWith(service, url){
+        const endpoint = service === 'isgd'
+          ? `https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`
+          : `https://v.gd/create.php?format=json&url=${encodeURIComponent(url)}`;
+        const resp = await fetch(endpoint, { method: 'GET' });
+        if (!resp.ok) throw new Error('请求失败');
+        const data = await resp.json();
+        if (data && data.shorturl) return data.shorturl;
+        if (data && data.errormessage) throw new Error(data.errormessage);
+        throw new Error('未知错误');
+      }
+
+      async function createShort(url){
+        // 优先 is.gd，失败回退 v.gd
+        try {
+          return await shortenWith('isgd', url);
+        } catch(e1) {
+          try {
+            return await shortenWith('vgd', url);
+          } catch(e2) {
+            throw e2;
+          }
+        }
+      }
+
+      async function onGenerate(){
+        const url = normalizeUrl(inputEl.value);
+        if (!url){ showModal('请输入有效链接'); return; }
+        loadingEl.classList.add('show');
+        genBtn.disabled = true; genBtn.textContent = '生成中…';
+        resEl.classList.remove('show'); shortEl.textContent=''; shortEl.href='#';
+        try {
+          const shortUrl = await createShort(url);
+          shortEl.textContent = shortUrl;
+          shortEl.href = shortUrl;
+          resEl.classList.add('show');
+          showToast('短链接已生成');
+        } catch(err){
+          console.error(err);
+          showToast('生成失败：' + (err?.message || '请稍后再试'));
+        } finally {
+          loadingEl.classList.remove('show');
+          genBtn.disabled = false; genBtn.textContent = '生成短链接';
+        }
+      }
+
+      async function onCopy(){
+        const text = shortEl.textContent.trim();
+        if (!text){ showToast('没有可复制的内容'); return; }
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast('已复制到剪贴板');
+        } catch(e){
+          // 兼容：选中文本复制
+          const range = document.createRange();
+          range.selectNode(shortEl);
+          const sel = window.getSelection();
+          sel.removeAllRanges(); sel.addRange(range);
+          showToast('请手动复制');
+        }
+      }
+
+      genBtn.addEventListener('click', onGenerate);
+      clearBtn.addEventListener('click', ()=>{ inputEl.value=''; resEl.classList.remove('show'); shortEl.textContent=''; shortEl.href='#'; });
+      copyBtn.addEventListener('click', onCopy);
+    </script>
+  </body>
+</html>
+

@@ -210,6 +210,28 @@
             const children = arr.filter(t=>this.isChild(t));
             const siblings = arr.filter(t=>this.isSibling(t));
             
+           // 处理"子女 + 父母"的情况（如：女儿的父亲 = 丈夫、儿子的母亲 = 我）
+           if (children.length === 1 && parents.length === 1 && siblings.length === 0) {
+             const child = children[0];
+             const parent = parents[0];
+             
+             if (parent === 'f') {
+               // 子女的父亲 = 丈夫
+               return '丈夫';
+             } else {
+               // 子女的母亲 = 我
+               return '我';
+             }
+           }
+           
+           // 处理"子女 + 兄弟姐妹"的情况（如：女儿的弟弟 = 儿子、儿子的姐姐 = 女儿）
+           if (children.length === 1 && siblings.length === 1 && parents.length === 0) {
+             const sibling = siblings[0];
+             const isMale = sibling === 'b' || sibling === 'yb';
+             
+             return isMale ? '儿子' : '女儿';
+           }
+           
            // 处理"父母 + 兄弟姐妹"的情况（如：母亲的兄弟 = 舅舅、父亲的姐妹 = 姑妈、祖辈的兄弟姐妹 = 舅公/姑婆/伯祖父等）
            if (parents.length >= 1 && siblings.length >= 1 && children.length === 0) {
              const sideFirst = parents[0];
