@@ -30,7 +30,7 @@
       .preview { margin: 12px; background: var(--card); border-radius: 12px; padding: 12px; display: none; }
       .preview.show { display: block; }
       .canvasBox { display: flex; justify-content: center; align-items: center; }
-      canvas { background: #fff; border-radius: 12px; }
+      canvas { background: transparent; border-radius: 12px; }
       .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); padding: 10px 14px; border-radius: 10px; background: rgba(0,0,0,0.75); color: #fff; font-size: 14px; display: none; }
       .toast.show { display: inline-block; }
       .actionbar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(17,24,39,0.92); backdrop-filter: blur(6px); display: flex; gap: 10px; align-items: center; box-shadow: 0 -10px 20px rgba(0,0,0,0.35); }
@@ -211,6 +211,8 @@
         <div class="txt">生成中…</div>
       </div>
     </div>
+    <!-- 预留空间，避免内容被底部固定操作栏遮挡 -->
+    <div class="spacer"></div>
     <div class="actionbar">
       <button class="btn" id="genBtn">生成二维码</button>
       <button class="btn secondary" id="clearBtn">清空</button>
@@ -228,7 +230,9 @@
       .imgModal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 100; }
       .imgModal.show { display: flex; }
       .imgWrap { max-width: min(96vw, 1000px); max-height: 88vh; text-align: center; }
-      .imgWrap img { max-width: 100%; max-height: 78vh; border-radius: 12px; background: #fff; }
+      .imgWrap img { max-width: 100%; max-height: 78vh; border-radius: 12px; background: transparent; }
+      /* 预留空间避免固定底部操作栏遮挡内容 */
+      .spacer { height: 76px; }
       .imgActions { margin-top: 10px; display: flex; gap: 10px; }
       .imgActions .btn { flex: 1; }
       .imgActions .btn.secondary { background: #334155; color: var(--text); }
