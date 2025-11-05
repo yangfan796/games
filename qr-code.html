@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>二维码生成器</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card: #111827;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --primary: #22c55e;
+        --primary-press: #16a34a;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+      .wrap { min-height: 100%; display: flex; flex-direction: column; }
+      header { padding: 18px 16px; text-align: center; font-weight: 600; }
+      .card { background: var(--card); margin: 0 12px; border-radius: 12px; padding: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+      .label { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+      .input, .select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #1f2937; outline: none; background: #0b1220; color: var(--text); font-size: 16px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .row { display: flex; gap: 10px; }
+      .btn { flex: 1; padding: 14px 12px; border: 0; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: 600; color: #07110a; background: var(--primary); }
+      .btn:active { background: var(--primary-press); }
+      .btn.secondary { flex: none; background: #334155; color: var(--text); }
+      .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+      .preview { margin: 12px; background: var(--card); border-radius: 12px; padding: 12px; display: none; }
+      .preview.show { display: block; }
+      .canvasBox { display: flex; justify-content: center; align-items: center; }
+      canvas { background: #fff; border-radius: 12px; }
+      .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); padding: 10px 14px; border-radius: 10px; background: rgba(0,0,0,0.75); color: #fff; font-size: 14px; display: none; }
+      .toast.show { display: inline-block; }
+      .actionbar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(17,24,39,0.92); backdrop-filter: blur(6px); display: flex; gap: 10px; align-items: center; box-shadow: 0 -10px 20px rgba(0,0,0,0.35); }
+      .loading { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; z-index: 99; }
+      .loading.show { display: flex; }
+      .spinner { width: 28px; height: 28px; border: 3px solid #94a3b8; border-top-color: transparent; border-radius: 50%; animation: spin 0.9s linear infinite; margin: 0 auto; }
+      .loading .txt { margin-top: 10px; color: var(--muted); font-size: 14px; text-align: center; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: flex-end; }
+      .modal.show { display: flex; }
+      .sheet { width: 100%; background: var(--card); border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+      .sheet .msg { color: var(--text); font-size: 16px; line-height: 1.6; }
+      .sheet .mclose { margin-top: 12px; width: 100%; padding: 12px; border: 0; border-radius: 10px; background: #334155; color: var(--text); font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>二维码生成器（支持颜色与Logo）</header>
+      <div class="card">
+        <div class="label">内容类型</div>
+        <select class="select" id="contentType">
+          <option value="url" selected>网页链接</option>
+          <option value="wifi">WiFi（直接连接）</option>
+          <option value="tel">电话（直接拨打）</option>
+        </select>
+
+        <div id="sectionUrl" style="margin-top:10px;">
+          <div class="label">网页链接</div>
+          <input class="input" id="urlInput" placeholder="例如：https://example.com/path" />
+        </div>
+
+        <div id="sectionWifi" style="margin-top:10px; display:none;">
+          <div class="grid">
+            <div>
+              <div class="label">WiFi 名称（SSID）</div>
+              <input class="input" id="wifiSsid" placeholder="例如：MyHomeWiFi" />
+            </div>
+            <div>
+              <div class="label">加密方式</div>
+              <select class="select" id="wifiType">
+                <option value="WPA" selected>WPA/WPA2</option>
+                <option value="WEP">WEP</option>
+                <option value="nopass">无密码</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid" style="margin-top:10px;">
+            <div>
+              <div class="label">WiFi 密码</div>
+              <input class="input" id="wifiPass" placeholder="如无密码可留空或选“无密码”" />
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+              <label style="display:flex; gap:8px; align-items:center;">
+                <input type="checkbox" id="wifiHidden" />
+                <span class="label" style="margin:0;">隐藏网络（Hidden）</span>
+              </label>
+            </div>
+          </div>
+          <div class="hint">提示：扫码可直接连接WiFi。特殊字符（\\ ; : , \"）将自动转义。</div>
+        </div>
+
+        <div id="sectionTel" style="margin-top:10px; display:none;">
+          <div class="label">电话号码</div>
+          <input class="input" id="telInput" placeholder="例如：13800000000 或 +8613800000000" />
+          <div class="hint">提示：扫码后将直接进入拨号界面。</div>
+        </div>
+
+        <div class="grid" style="margin-top:10px;">
+          <div>
+            <div class="label">前景色</div>
+            <input type="color" class="input" id="fgColor" value="#000000" />
+          </div>
+          <div>
+            <div class="label">背景色</div>
+            <input type="color" class="input" id="bgColor" value="#ffffff" />
+          </div>
+        </div>
+
+        <div class="grid" style="margin-top:10px;">
+          <div>
+            <div class="label">纠错等级</div>
+            <select class="select" id="ecc">
+              <option value="L">L（7%）</option>
+              <option value="M">M（15%）</option>
+              <option value="Q">Q（25%）</option>
+              <option value="H" selected>H（30%）</option>
+            </select>
+          </div>
+          <div>
+            <div class="label">尺寸（px）</div>
+            <input class="input" id="size" type="number" min="200" max="800" value="320" />
+          </div>
+        </div>
+
+        <div class="grid" style="margin-top:10px;">
+          <div>
+            <div class="label">码点形状</div>
+            <select class="select" id="moduleShape">
+              <option value="square" selected>方形</option>
+              <option value="rounded">圆角</option>
+              <option value="circle">圆形</option>
+              <option value="smallSquare">小方点</option>
+              <option value="diamond">菱形</option>
+              <option value="thinStar">细星型</option>
+              <option value="liquid">液化</option>
+              <option value="tile">瓷砖</option>
+            </select>
+          </div>
+          <div>
+            <div class="label">码眼形状</div>
+            <select class="select" id="eyeShape">
+              <option value="square" selected>方形</option>
+              <option value="rounded">圆角</option>
+              <option value="circle">圆形</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid" style="margin-top:10px;">
+          <div>
+            <div class="label">码眼颜色</div>
+            <select class="select" id="eyeColorPreset">
+              <option value="#000000" selected>黑色</option>
+              <option value="#2563eb">蓝色</option>
+              <option value="#06b6d4">青色</option>
+              <option value="#10b981">绿色</option>
+              <option value="#f59e0b">金橙</option>
+              <option value="#ef4444">红色</option>
+              <option value="#a855f7">紫色</option>
+              <option value="#ec4899">玫红</option>
+              <option value="#14b8a6">水鸭绿</option>
+              <option value="custom">自定义颜色…</option>
+            </select>
+          </div>
+          <div>
+            <div class="label">自定义码眼颜色</div>
+            <input type="color" class="input" id="eyeColorCustom" value="#000000" />
+            <div class="hint">当选择“自定义颜色”时生效。</div>
+          </div>
+        </div>
+
+        <div class="grid" style="margin-top:10px;">
+          <div>
+            <div class="label">码边距（色块数）</div>
+            <select class="select" id="marginModules">
+              <option value="1">1</option>
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+            <div class="hint">设置二维码四周的静区宽度（以模块数计）。</div>
+          </div>
+          <div></div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div class="label">Logo（可选，居中覆盖）</div>
+          <input class="input" id="logoInput" type="file" accept="image/*" />
+          <div class="hint">建议使用透明背景的正方形Logo；Logo区域含白色底增强可识别性。</div>
+        </div>
+      </div>
+
+      <div class="preview" id="preview">
+        <div class="label">二维码预览</div>
+        <div class="canvasBox"><canvas id="qrCanvas" width="320" height="320"></canvas></div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn secondary" id="downloadBtn">下载PNG</button>
+        </div>
+      </div>
+      <!-- 隐藏的临时容器，用于兼容另一类 QRCode 库（构造函数模式） -->
+      <div id="qrTemp" style="position:absolute;left:-9999px;top:-9999px;width:0;height:0;overflow:hidden;"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <div class="loading" id="loading">
+      <div>
+        <div class="spinner"></div>
+        <div class="txt">生成中…</div>
+      </div>
+    </div>
+    <div class="actionbar">
+      <button class="btn" id="genBtn">生成二维码</button>
+      <button class="btn secondary" id="clearBtn">清空</button>
+    </div>
+
+    <div class="modal" id="modal">
+      <div class="sheet">
+        <div class="msg" id="modalMsg">请输入有效链接</div>
+        <button class="mclose" id="modalClose">我知道了</button>
+      </div>
+    </div>
+
+    <!-- 大图查看器 -->
+    <style>
+      .imgModal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 100; }
+      .imgModal.show { display: flex; }
+      .imgWrap { max-width: min(96vw, 1000px); max-height: 88vh; text-align: center; }
+      .imgWrap img { max-width: 100%; max-height: 78vh; border-radius: 12px; background: #fff; }
+      .imgActions { margin-top: 10px; display: flex; gap: 10px; }
+      .imgActions .btn { flex: 1; }
+      .imgActions .btn.secondary { background: #334155; color: var(--text); }
+    </style>
+    <div class="imgModal" id="imgModal">
+      <div class="imgWrap" id="imgWrap">
+        <img id="largeImg" alt="二维码大图" />
+        <div class="imgActions">
+          <button class="btn" id="imgSaveBtn">保存PNG</button>
+          <button class="btn secondary" id="imgCloseBtn">关闭</button>
+        </div>
+        <div class="hint">提示：移动端可长按图片保存</div>
+      </div>
+    </div>
+
+    <!-- qrcode 库（纯前端，本地静态引入） -->
+    <script src="./qrcode.min.js"></script>
+    <script>
+      const inputEl = document.getElementById('urlInput');
+      const contentTypeEl = document.getElementById('contentType');
+      const sectionUrlEl = document.getElementById('sectionUrl');
+      const sectionWifiEl = document.getElementById('sectionWifi');
+      const sectionTelEl = document.getElementById('sectionTel');
+      const wifiSsidEl = document.getElementById('wifiSsid');
+      const wifiTypeEl = document.getElementById('wifiType');
+      const wifiPassEl = document.getElementById('wifiPass');
+      const wifiHiddenEl = document.getElementById('wifiHidden');
+      const telEl = document.getElementById('telInput');
+      const fgEl = document.getElementById('fgColor');
+      const bgEl = document.getElementById('bgColor');
+      const eccEl = document.getElementById('ecc');
+      const sizeEl = document.getElementById('size');
+      const moduleShapeEl = document.getElementById('moduleShape');
+      const eyeShapeEl = document.getElementById('eyeShape');
+      const marginModulesEl = document.getElementById('marginModules');
+      const eyeColorPresetEl = document.getElementById('eyeColorPreset');
+      const eyeColorCustomEl = document.getElementById('eyeColorCustom');
+      const logoFileEl = document.getElementById('logoInput');
+      const canvas = document.getElementById('qrCanvas');
+      const ctx = canvas.getContext('2d');
+      const previewEl = document.getElementById('preview');
+      const genBtn = document.getElementById('genBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const downloadBtn = document.getElementById('downloadBtn');
+      const toastEl = document.getElementById('toast');
+      const loadingEl = document.getElementById('loading');
+      const modalEl = document.getElementById('modal');
+      const modalMsgEl = document.getElementById('modalMsg');
+      const modalCloseEl = document.getElementById('modalClose');
+      const tmpEl = document.getElementById('qrTemp');
+      // 大图查看器元素
+      const imgModalEl = document.getElementById('imgModal');
+      const largeImgEl = document.getElementById('largeImg');
+      const imgSaveBtn = document.getElementById('imgSaveBtn');
+      const imgCloseBtn = document.getElementById('imgCloseBtn');
+
+      function showToast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); setTimeout(()=> toastEl.classList.remove('show'), 1800); }
+      function showModal(msg){ modalMsgEl.textContent = msg || '提示'; modalEl.classList.add('show'); }
+      function hideModal(){ modalEl.classList.remove('show'); }
+      modalEl.addEventListener('click', (e)=>{ if (e.target === modalEl) hideModal(); });
+      modalCloseEl.addEventListener('click', hideModal);
+
+      function normalizeUrl(u){
+        let url = (u || '').trim();
+        if (!url) return '';
+        try {
+          if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+          new URL(url);
+          return url;
+        } catch(e) { return ''; }
+      }
+
+      function escapeWifiField(s){
+        return String(s || '').replace(/([\\;:,\"])/g, '\\$1');
+      }
+
+      function buildPayload(){
+        const t = contentTypeEl.value || 'url';
+        if (t === 'url'){
+          const url = normalizeUrl(inputEl.value);
+          if (!url) throw new Error('请输入有效链接');
+          return url;
+        } else if (t === 'wifi'){
+          const ssid = (wifiSsidEl.value || '').trim();
+          const type = wifiTypeEl.value || 'WPA';
+          const pass = (wifiPassEl.value || '').trim();
+          const hidden = !!wifiHiddenEl.checked;
+          if (!ssid) throw new Error('请输入WiFi名称（SSID）');
+          if (type !== 'nopass' && !pass) throw new Error('请输入WiFi密码或选择“无密码”');
+          const escS = escapeWifiField(ssid);
+          const escP = escapeWifiField(pass);
+          // WIFI QR 标准：WIFI:T:<auth>;S:<ssid>;P:<password>;H:<hidden>;;
+          let payload = `WIFI:T:${type};S:${escS};`;
+          if (type !== 'nopass') payload += `P:${escP};`;
+          payload += `H:${hidden ? 'true' : 'false'};;`;
+          return payload;
+        } else if (t === 'tel'){
+          let num = String(telEl.value || '').trim();
+          if (!num) throw new Error('请输入电话号码');
+          // 去除空格，保留 +、数字与常见分隔符
+          num = num.replace(/\s+/g, '');
+          return `tel:${num}`;
+        }
+        throw new Error('未知内容类型');
+      }
+
+      // 备用加载：若全局未存在 QRCode，则优先尝试本地文件，失败再尝试CDN
+      function loadScript(src){
+        return new Promise((resolve, reject)=>{
+          const s = document.createElement('script');
+          s.src = src; s.async = true; s.onload = resolve; s.onerror = () => reject(new Error('加载失败: ' + src));
+          document.head.appendChild(s);
+        });
+      }
+
+      async function ensureQRCodeLib(){
+        if (window.QRCode) return;
+        const candidates = [
+          './qrcode.min.js',
+          'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+          'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js'
+        ];
+        for (const url of candidates){
+          try { await loadScript(url); if (window.QRCode) return; } catch(e){ /* 下一候选 */ }
+        }
+        throw new Error('无法加载二维码库，请检查网络或稍后再试');
+      }
+
+      function setCanvasSize(n){ canvas.width = n; canvas.height = n; }
+
+      function drawRoundedRect(ctx, x, y, w, h, r){
+        const radius = Math.min(r, w/2, h/2);
+        ctx.beginPath();
+        ctx.moveTo(x+radius, y);
+        ctx.arcTo(x+w, y, x+w, y+h, radius);
+        ctx.arcTo(x+w, y+h, x, y+h, radius);
+        ctx.arcTo(x, y+h, x, y, radius);
+        ctx.arcTo(x, y, x+w, y, radius);
+        ctx.closePath();
+      }
+
+      function drawDiamond(ctx, cx, cy, s){
+        const r = s/2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - r);
+        ctx.lineTo(cx + r, cy);
+        ctx.lineTo(cx, cy + r);
+        ctx.lineTo(cx - r, cy);
+        ctx.closePath();
+      }
+
+      function drawThinStar(ctx, cx, cy, s){
+        const outer = s/2;
+        const inner = s*0.22;
+        const points = 8; // 细星型：8尖
+        ctx.beginPath();
+        for (let i=0;i<points;i++){
+          const angleOuter = (Math.PI*2) * (i/points);
+          const angleInner = angleOuter + Math.PI/points;
+          const ox = cx + Math.cos(angleOuter) * outer;
+          const oy = cy + Math.sin(angleOuter) * outer;
+          const ix = cx + Math.cos(angleInner) * inner;
+          const iy = cy + Math.sin(angleInner) * inner;
+          if (i===0){ ctx.moveTo(ox, oy); } else { ctx.lineTo(ox, oy); }
+          ctx.lineTo(ix, iy);
+        }
+        ctx.closePath();
+      }
+
+      function drawLogoIfAny(){
+        const file = logoFileEl.files && logoFileEl.files[0];
+        if (!file) return Promise.resolve();
+        return new Promise((resolve)=>{
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              const size = canvas.width;
+              const logoSize = Math.round(size * 0.22); // 约22%尺寸
+              const pad = Math.round(logoSize * 0.12);
+              const bgSize = logoSize + pad * 2;
+              const x = Math.round((size - bgSize)/2);
+              const y = Math.round((size - bgSize)/2);
+
+              // 白底圆角矩形，增强识别
+              ctx.save();
+              ctx.fillStyle = '#ffffff';
+              drawRoundedRect(ctx, x, y, bgSize, bgSize, Math.round(bgSize/6));
+              ctx.fill();
+              ctx.restore();
+
+              // 绘制logo居中
+              const lx = x + pad;
+              const ly = y + pad;
+              ctx.drawImage(img, lx, ly, logoSize, logoSize);
+              resolve();
+            };
+            img.src = reader.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // 生成矩阵：兼容 npm 'qrcode' 与 qrcodejs
+      async function createQrMatrix(url, ecc){
+        await ensureQRCodeLib();
+        // npm 版：提供 create()
+        if (window.QRCode && typeof window.QRCode.create === 'function'){
+          const model = window.QRCode.create(url, { errorCorrectionLevel: ecc || 'H' });
+          const size = model.modules.size;
+          const data = model.modules.data;
+          return {
+            count: size,
+            isDark: (r, c) => !!data[r * size + c]
+          };
+        }
+        // qrcodejs 构造函数：从内部对象取模块
+        if (typeof window.QRCode === 'function'){
+          tmpEl.innerHTML = '';
+          const CorrectLevel = window.QRCode.CorrectLevel || {};
+          const levelMap = { L: CorrectLevel.L, M: CorrectLevel.M, Q: CorrectLevel.Q, H: CorrectLevel.H };
+          const inst = new window.QRCode(tmpEl, {
+            text: url,
+            width: 128,
+            height: 128,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: levelMap[ecc] || CorrectLevel.H
+          });
+          if (typeof inst.makeCode === 'function') inst.makeCode(url);
+          await new Promise((res)=> setTimeout(res, 0));
+          const internal = inst._oQRCode || inst;
+          const count = (typeof internal.getModuleCount === 'function') ? internal.getModuleCount() : internal.moduleCount;
+          const isDark = (r, c) => (typeof internal.isDark === 'function') ? internal.isDark(r, c) : (internal.modules ? !!internal.modules[r][c] : false);
+          tmpEl.innerHTML = '';
+          if (!count) throw new Error('矩阵生成失败');
+          return { count, isDark };
+        }
+        throw new Error('无法创建二维码矩阵');
+      }
+
+      function inEyeArea(r, c, count){
+        const inTL = (r >= 0 && r < 7) && (c >= 0 && c < 7);
+        const inTR = (r >= 0 && r < 7) && (c >= count - 7 && c < count);
+        const inBL = (r >= count - 7 && r < count) && (c >= 0 && c < 7);
+        return inTL || inTR || inBL;
+      }
+
+      async function renderStyledQRCode(url, size, fg, bg, ecc, marginModules, moduleShape, eyeShape, eyeColor, targetCanvas, targetCtx){
+        const tCanvas = targetCanvas || canvas;
+        const tCtx = targetCtx || ctx;
+        tCtx.clearRect(0, 0, tCanvas.width, tCanvas.height);
+        tCtx.save(); tCtx.fillStyle = bg || '#ffffff'; tCtx.fillRect(0, 0, tCanvas.width, tCanvas.height); tCtx.restore();
+        const matrix = await createQrMatrix(url, ecc);
+        const count = matrix.count;
+        const quiet = Math.max(1, Math.min(parseInt(marginModules || '2', 10), 4));
+        const total = count + quiet * 2;
+        // 使用浮点模块尺寸，保证实际绘制区域正好等于目标 size，无额外居中留白
+        const moduleSize = size / total;
+        const offsetX = 0;
+        const offsetY = 0;
+        const drawCell = (x, y, shape, color) => {
+          const cx = x + moduleSize/2, cy = y + moduleSize/2;
+          tCtx.fillStyle = color;
+          if (shape === 'circle'){
+            tCtx.beginPath(); tCtx.arc(cx, cy, moduleSize/2, 0, Math.PI * 2); tCtx.fill();
+          } else if (shape === 'rounded'){
+            drawRoundedRect(tCtx, x, y, moduleSize, moduleSize, Math.floor(moduleSize * 0.35)); tCtx.fill();
+          } else if (shape === 'smallSquare'){
+            const s = moduleSize * 0.68; tCtx.fillRect(cx - s/2, cy - s/2, s, s);
+          } else if (shape === 'diamond'){
+            drawDiamond(tCtx, cx, cy, moduleSize); tCtx.fill();
+          } else if (shape === 'thinStar'){
+            drawThinStar(tCtx, cx, cy, moduleSize); tCtx.fill();
+          } else if (shape === 'liquid'){
+            drawRoundedRect(tCtx, x, y, moduleSize, moduleSize, moduleSize * 0.48); tCtx.fill();
+          } else if (shape === 'tile'){
+            const s = moduleSize * 0.9; tCtx.fillRect(cx - s/2, cy - s/2, s, s);
+            tCtx.strokeStyle = 'rgba(255,255,255,0.65)'; tCtx.lineWidth = Math.max(1, moduleSize*0.06);
+            tCtx.strokeRect(cx - s/2, cy - s/2, s, s);
+          } else {
+            tCtx.fillRect(x, y, moduleSize, moduleSize);
+          }
+        };
+        for (let r = 0; r < count; r++){
+          for (let c = 0; c < count; c++){
+            if (!matrix.isDark(r, c)) continue;
+            const sx = offsetX + (quiet + c) * moduleSize;
+            const sy = offsetY + (quiet + r) * moduleSize;
+            const shape = inEyeArea(r, c, count) ? (eyeShape || 'square') : (moduleShape || 'square');
+            const color = inEyeArea(r, c, count) ? (eyeColor || fg || '#000000') : (fg || '#000000');
+            drawCell(sx, sy, shape, color);
+          }
+        }
+      }
+
+      // 在指定画布上绘制 Logo（用于大图）
+      function drawLogoOn(targetCanvas, targetCtx){
+        const file = logoFileEl.files && logoFileEl.files[0];
+        if (!file) return Promise.resolve();
+        return new Promise((resolve)=>{
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              const size = targetCanvas.width;
+              const logoSize = Math.round(size * 0.22);
+              const pad = Math.round(logoSize * 0.12);
+              const bgSize = logoSize + pad * 2;
+              const x = Math.round((size - bgSize)/2);
+              const y = Math.round((size - bgSize)/2);
+
+              targetCtx.save();
+              targetCtx.fillStyle = '#ffffff';
+              drawRoundedRect(targetCtx, x, y, bgSize, bgSize, Math.round(bgSize/6));
+              targetCtx.fill();
+              targetCtx.restore();
+
+              const lx = x + pad;
+              const ly = y + pad;
+              targetCtx.drawImage(img, lx, ly, logoSize, logoSize);
+              resolve();
+            };
+            img.src = reader.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function openImageViewer(){
+        let payload;
+        try { payload = buildPayload(); }
+        catch(e){ showModal(e?.message || '请输入有效内容'); return; }
+        const baseSize = Math.max(200, Math.min(800, parseInt(sizeEl.value || '320', 10)));
+        const bigSize = Math.max(baseSize, 800);
+        const marginModules = Math.max(1, Math.min(4, parseInt(marginModulesEl.value || '2', 10)));
+        const moduleShape = moduleShapeEl.value || 'square';
+        const eyeShape = eyeShapeEl.value || 'square';
+        const eyeColor = (eyeColorPresetEl.value === 'custom') ? (eyeColorCustomEl.value || '#000000') : eyeColorPresetEl.value;
+        const bigCanvas = document.createElement('canvas');
+        bigCanvas.width = bigSize; bigCanvas.height = bigSize;
+        const bigCtx = bigCanvas.getContext('2d');
+        try {
+          loadingEl.classList.add('show');
+          await renderStyledQRCode(payload, bigSize, fgEl.value, bgEl.value, (eccEl.value || 'H'), marginModules, moduleShape, eyeShape, eyeColor, bigCanvas, bigCtx);
+          await drawLogoOn(bigCanvas, bigCtx);
+          const uri = bigCanvas.toDataURL('image/png');
+          largeImgEl.src = uri;
+          imgModalEl.classList.add('show');
+        } catch(e){
+          console.error(e); showToast('查看大图失败：' + (e?.message || '请稍后再试'));
+        } finally {
+          loadingEl.classList.remove('show');
+        }
+      }
+
+      async function generate(){
+        let payload;
+        try { payload = buildPayload(); }
+        catch(e){ showModal(e?.message || '请输入有效内容'); return; }
+        const size = Math.max(200, Math.min(800, parseInt(sizeEl.value || '320', 10)));
+        const marginModules = Math.max(1, Math.min(4, parseInt(marginModulesEl.value || '2', 10)));
+        const moduleShape = moduleShapeEl.value || 'square';
+        const eyeShape = eyeShapeEl.value || 'square';
+        const eyeColor = (eyeColorPresetEl.value === 'custom') ? (eyeColorCustomEl.value || '#000000') : eyeColorPresetEl.value;
+        setCanvasSize(size);
+        loadingEl.classList.add('show'); genBtn.disabled = true; genBtn.textContent = '生成中…';
+        try {
+          await renderStyledQRCode(payload, size, fgEl.value, bgEl.value, eccEl.value || 'H', marginModules, moduleShape, eyeShape, eyeColor, undefined, undefined);
+          await drawLogoIfAny();
+          previewEl.classList.add('show');
+          showToast('二维码已生成');
+        } catch(e){
+          console.error(e);
+          showToast('生成失败：' + (e?.message || '请稍后再试'));
+        } finally {
+          loadingEl.classList.remove('show'); genBtn.disabled = false; genBtn.textContent = '生成二维码';
+        }
+      }
+
+      function clearAll(){
+        inputEl.value = '';
+        // 保留颜色与配置，但清空预览与logo
+        logoFileEl.value = '';
+        previewEl.classList.remove('show');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        showToast('已清空');
+      }
+
+      function downloadPng(){
+        const uri = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = uri; a.download = 'qrcode.png';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+
+      genBtn.addEventListener('click', generate);
+      clearBtn.addEventListener('click', clearAll);
+      downloadBtn.addEventListener('click', downloadPng);
+      // 点击预览打开大图查看
+      canvas.addEventListener('click', openImageViewer);
+      // 内容类型切换（显示不同表单）
+      function syncSections(){
+        const t = contentTypeEl.value || 'url';
+        sectionUrlEl.style.display = (t === 'url') ? 'block' : 'none';
+        sectionWifiEl.style.display = (t === 'wifi') ? 'block' : 'none';
+        sectionTelEl.style.display = (t === 'tel') ? 'block' : 'none';
+      }
+      contentTypeEl.addEventListener('change', syncSections);
+      syncSections();
+      // 自定义码眼颜色开关
+      function syncEyeColorInput(){
+        const isCustom = eyeColorPresetEl.value === 'custom';
+        eyeColorCustomEl.disabled = !isCustom;
+        eyeColorCustomEl.style.opacity = isCustom ? '1' : '0.6';
+      }
+      eyeColorPresetEl.addEventListener('change', syncEyeColorInput);
+      syncEyeColorInput();
+      // 大图查看器交互
+      imgCloseBtn.addEventListener('click', ()=> imgModalEl.classList.remove('show'));
+      imgModalEl.addEventListener('click', (e)=>{ if (e.target === imgModalEl) imgModalEl.classList.remove('show'); });
+      imgSaveBtn.addEventListener('click', ()=>{
+        if (!largeImgEl.src){ showToast('请先生成二维码'); return; }
+        const a = document.createElement('a');
+        a.href = largeImgEl.src; a.download = 'qrcode-large.png';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      });
+    </script>
+  </body>
+  </html>
